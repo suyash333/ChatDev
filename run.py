@@ -33,7 +33,16 @@ def get_config(company):
 
     Returns:
         path to three configuration jsons: [config_path, config_phase_path, config_role_path]
+    
+    Raises:
+        FileNotFoundError: if default configuration files are missing
+        ValueError: if company name contains invalid characters
     """
+    # Validate company name for security
+    import re
+    if not re.match(r'^[a-zA-Z0-9_\-]+$', company):
+        raise ValueError(f"Invalid company name: {company}. Only letters, numbers, underscores, and hyphens allowed.")
+    
     config_dir = os.path.join(root, "CompanyConfig", company)
     default_config_dir = os.path.join(root, "CompanyConfig", "Default")
 
@@ -51,8 +60,10 @@ def get_config(company):
 
         if os.path.exists(company_config_path):
             config_paths.append(company_config_path)
-        else:
+        elif os.path.exists(default_config_path):
             config_paths.append(default_config_path)
+        else:
+            raise FileNotFoundError(f"Configuration file not found: {config_file}")
 
     return tuple(config_paths)
 
@@ -69,6 +80,19 @@ parser.add_argument('--name', type=str, default="Gomoku",
 parser.add_argument('--model', type=str, default="GPT_3_5_TURBO",
                     help="GPT Model, choose from {'GPT_3_5_TURBO','GPT_4','GPT_4_32K'}")
 args = parser.parse_args()
+
+# Validate inputs
+if not args.task.strip():
+    raise ValueError("Task prompt cannot be empty")
+if not args.name.strip():
+    raise ValueError("Project name cannot be empty")
+if args.model not in ['GPT_3_5_TURBO', 'GPT_4', 'GPT_4_32K']:
+    raise ValueError(f"Invalid model: {args.model}. Choose from GPT_3_5_TURBO, GPT_4, GPT_4_32K")
+
+# Validate project name for file system safety
+import re
+if not re.match(r'^[a-zA-Z0-9_\-]+$', args.name):
+    raise ValueError("Project name can only contain letters, numbers, underscores, and hyphens")
 
 # Start ChatDev
 
@@ -88,9 +112,23 @@ chat_chain = ChatChain(config_path=config_path,
 # ----------------------------------------
 #          Init Log
 # ----------------------------------------
-logging.basicConfig(filename=chat_chain.log_filepath, level=logging.INFO,
-                    format='[%(asctime)s %(levelname)s] %(message)s',
-                    datefmt='%Y-%d-%m %H:%M:%S', encoding="utf-8")
+try:
+    logging.basicConfig(
+        filename=chat_chain.log_filepath, 
+        level=logging.INFO,
+        format='[%(asctime)s %(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S', 
+        encoding="utf-8"
+    )
+    # Also log to console for debugging
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.WARNING)
+    console_formatter = logging.Formatter('[%(levelname)s] %(message)s')
+    console_handler.setFormatter(console_formatter)
+    logging.getLogger().addHandler(console_handler)
+except Exception as e:
+    print(f"Warning: Could not set up logging: {e}")
+    # Continue without logging to file
 
 # ----------------------------------------
 #          Pre Processing

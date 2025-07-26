@@ -57,11 +57,36 @@ class ChatEnv:
         if "ModuleNotFoundError" in test_reports:
             for match in re.finditer(r"No module named '(\S+)'", test_reports, re.DOTALL):
                 module = match.group(1)
-                subprocess.Popen("pip install {}".format(module), shell=True).wait()
-                log_and_print_online("**[CMD Execute]**\n\n[CMD] pip install {}".format(module))
+                # Validate module name to prevent command injection
+                if re.match(r'^[a-zA-Z0-9_\-\.]+$', module):
+                    try:
+                        subprocess.run(["pip", "install", module], check=True, capture_output=True, text=True)
+                        log_and_print_online("**[CMD Execute]**\n\n[CMD] pip install {}".format(module))
+                    except subprocess.CalledProcessError as e:
+                        log_and_print_online("**[CMD Error]**\n\nFailed to install module {}: {}".format(module, e))
+                else:
+                    log_and_print_online("**[Security Warning]**\n\nInvalid module name detected: {}".format(module))
 
     def set_directory(self, directory):
-        assert len(self.env_dict['directory']) == 0
+        """
+        Set the working directory for the ChatDev environment.
+        
+        Args:
+            directory: Path to the directory to set as working directory
+            
+        Raises:
+            ValueError: If directory is already set or invalid
+        """
+        if len(self.env_dict['directory']) != 0:
+            raise ValueError("Directory already set. Cannot change existing directory.")
+            
+        # Validate directory path
+        if not directory or not isinstance(directory, str):
+            raise ValueError("Directory must be a non-empty string")
+            
+        # Normalize the path
+        directory = os.path.normpath(os.path.abspath(directory))
+        
         self.env_dict['directory'] = directory
         self.codes.directory = directory
         self.requirements.directory = directory
@@ -74,31 +99,38 @@ class ChatEnv:
         if self.config.clear_structure:
             if os.path.exists(self.env_dict['directory']):
                 shutil.rmtree(self.env_dict['directory'])
-                os.mkdir(self.env_dict['directory'])
+                os.makedirs(self.env_dict['directory'], exist_ok=True)
                 print("{} Created".format(directory))
             else:
-                os.mkdir(self.env_dict['directory'])
+                os.makedirs(self.env_dict['directory'], exist_ok=True)
 
     def exist_bugs(self) -> tuple[bool, str]:
         directory = self.env_dict['directory']
 
         success_info = "The software run successfully without errors."
         try:
+            # Validate directory path to prevent directory traversal
+            if not os.path.isabs(directory):
+                directory = os.path.abspath(directory)
+            if not os.path.exists(directory):
+                return True, f"Directory does not exist: {directory}"
 
             # check if we are on windows or linux
             if os.name == 'nt':
-                command = "cd {} && dir && python main.py".format(directory)
+                # Use subprocess.run with list arguments for security
+                list_process = subprocess.run(["cmd", "/c", "dir"], cwd=directory, capture_output=True, text=True)
                 process = subprocess.Popen(
-                    command,
-                    shell=True,
+                    ["python", "main.py"],
+                    cwd=directory,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
                 )
             else:
-                command = "cd {}; ls -l; python3 main.py;".format(directory)
-                process = subprocess.Popen(command,
-                                           shell=True,
+                # Use subprocess.run with list arguments for security
+                list_process = subprocess.run(["ls", "-l"], cwd=directory, capture_output=True, text=True)
+                process = subprocess.Popen(["python3", "main.py"],
+                                           cwd=directory,
                                            preexec_fn=os.setsid,
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE

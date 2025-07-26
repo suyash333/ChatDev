@@ -47,12 +47,19 @@ class ChatChain:
         self.org_name = org_name
         self.model_type = model_type
 
-        with open(self.config_path, 'r', encoding="utf8") as file:
-            self.config = json.load(file)
-        with open(self.config_phase_path, 'r', encoding="utf8") as file:
-            self.config_phase = json.load(file)
-        with open(self.config_role_path, 'r', encoding="utf8") as file:
-            self.config_role = json.load(file)
+        try:
+            with open(self.config_path, 'r', encoding="utf8") as file:
+                self.config = json.load(file)
+            with open(self.config_phase_path, 'r', encoding="utf8") as file:
+                self.config_phase = json.load(file)
+            with open(self.config_role_path, 'r', encoding="utf8") as file:
+                self.config_role = json.load(file)
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Configuration file not found: {e}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in configuration file: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Error loading configuration files: {e}")
 
         # init chatchain config and recruitments
         self.chain = self.config["chain"]
