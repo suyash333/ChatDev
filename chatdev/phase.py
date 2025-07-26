@@ -66,7 +66,7 @@ class Phase(ABC):
         """
 
         Args:
-            chat_env: global chatchain environment TODO: only for employee detection, can be deleted
+            chat_env: global chatchain environment for employee detection and management
             task_prompt: user query prompt for building the software
             assistant_role_name: who receives the chat
             user_role_name: who starts the chat
@@ -133,16 +133,20 @@ class Phase(ABC):
             conversation_meta = "**" + assistant_role_name + "<->" + user_role_name + " on : " + str(
                 phase_name) + ", turn " + str(i) + "**\n\n"
 
-            # TODO: max_tokens_exceeded errors here
-            if isinstance(assistant_response.msg, ChatMessage):
-                # we log the second interaction here
-                log_and_print_online(role_play_session.assistant_agent.role_name,
-                                     conversation_meta + "[" + role_play_session.user_agent.system_message.content + "]\n\n" + assistant_response.msg.content)
-                if role_play_session.assistant_agent.info:
-                    seminar_conclusion = assistant_response.msg.content
-                    break
-                if assistant_response.terminated:
-                    break
+            # Handle potential token limit errors in the API response
+            try:
+                if isinstance(assistant_response.msg, ChatMessage):
+                    # we log the second interaction here
+                    log_and_print_online(role_play_session.assistant_agent.role_name,
+                                         conversation_meta + "[" + role_play_session.user_agent.system_message.content + "]\n\n" + assistant_response.msg.content)
+                    if role_play_session.assistant_agent.info:
+                        seminar_conclusion = assistant_response.msg.content
+                        break
+                    if assistant_response.terminated:
+                        break
+            except Exception as e:
+                log_and_print_online("Error", f"Token limit or API error occurred: {e}")
+                break
 
             if isinstance(user_response.msg, ChatMessage):
                 # here is the result of the second interaction, which may be used to start the next chat turn
