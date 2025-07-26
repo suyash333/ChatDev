@@ -68,7 +68,25 @@ class ChatEnv:
                     log_and_print_online("**[Security Warning]**\n\nInvalid module name detected: {}".format(module))
 
     def set_directory(self, directory):
-        assert len(self.env_dict['directory']) == 0
+        """
+        Set the working directory for the ChatDev environment.
+        
+        Args:
+            directory: Path to the directory to set as working directory
+            
+        Raises:
+            ValueError: If directory is already set or invalid
+        """
+        if len(self.env_dict['directory']) != 0:
+            raise ValueError("Directory already set. Cannot change existing directory.")
+            
+        # Validate directory path
+        if not directory or not isinstance(directory, str):
+            raise ValueError("Directory must be a non-empty string")
+            
+        # Normalize the path
+        directory = os.path.normpath(os.path.abspath(directory))
+        
         self.env_dict['directory'] = directory
         self.codes.directory = directory
         self.requirements.directory = directory
@@ -81,10 +99,10 @@ class ChatEnv:
         if self.config.clear_structure:
             if os.path.exists(self.env_dict['directory']):
                 shutil.rmtree(self.env_dict['directory'])
-                os.mkdir(self.env_dict['directory'])
+                os.makedirs(self.env_dict['directory'], exist_ok=True)
                 print("{} Created".format(directory))
             else:
-                os.mkdir(self.env_dict['directory'])
+                os.makedirs(self.env_dict['directory'], exist_ok=True)
 
     def exist_bugs(self) -> tuple[bool, str]:
         directory = self.env_dict['directory']
